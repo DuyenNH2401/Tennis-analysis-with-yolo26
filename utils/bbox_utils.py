@@ -4,11 +4,13 @@ def get_center_bbox(bbox):
     center_y = int((ymax + ymin) / 2)
     return center_x, center_y
 
-def measure_distance(p1, court_keypoints):
+def measure_distance(p1, p2):
+    return ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)**0.5
+
+def get_court_center(court_keypoints):
     court_x_coords = [court_keypoints[i] for i in range(0, len(court_keypoints), 2)]
-    court_center_x = sum(court_x_coords) / len(court_x_coords)
-    distance = abs(p1[0] - court_center_x)
-    return distance
+    court_y_coords = [court_keypoints[i] for i in range(1, len(court_keypoints), 2)]
+    return sum(court_x_coords) / len(court_x_coords), sum(court_y_coords) / len(court_y_coords)
 
 def get_foot_position(bbox):
     xmin, ymin, xmax, ymax = bbox
@@ -32,7 +34,4 @@ def get_height_of_bbox(bbox):
     return ymax - ymin
 
 def measure_xy_distance(p1, p2):
-    return p1[0] - p2[0], p1[1] - p2[1]
-
-def measure_point_distance(p1, p2):
-    return ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)**0.5
+    return abs(p1[0] - p2[0]), abs(p1[1] - p2[1])

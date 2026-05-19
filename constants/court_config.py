@@ -22,3 +22,9 @@ class Config:
             (2, 3),
             (12, 13)
         ]
+
+    # Tracking Config
+    PLAYER_CONFIDENCE = 0.2
+    BALL_CONFIDENCE = 0.25
+    MINIMUM_CHANGE_FRAMES_FOR_HIT = 25
+    ROLLING_WINDOW_SIZE = 5

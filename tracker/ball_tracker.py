@@ -2,10 +2,12 @@ from ultralytics import YOLO
 import cv2
 import pickle
 import pandas as pd
+from constants import Config
 
 class BallTracker:
     def __init__(self, model_path):
         self.model = YOLO(model_path)
+        self.config = Config()
 
     @staticmethod
     def interpolate_ball_positions(ball_positions):
@@ -16,17 +18,16 @@ class BallTracker:
         ball_positions = [{1: x} for x in df_ball_pos.to_numpy().tolist()]
         return ball_positions
 
-    @staticmethod
-    def get_ball_shot_frames(ball_positions):
+    def get_ball_shot_frames(self, ball_positions):
         ball_positions = [x.get(1, []) for x in ball_positions]
         df_ball_positions = pd.DataFrame(ball_positions, columns=['x1', 'y1', 'x2', 'y2'])
         df_ball_positions['ball_hit'] = 0
 
         df_ball_positions['mid_y'] = (df_ball_positions['y1'] + df_ball_positions['y2']) / 2
-        df_ball_positions['mid_y_rolling_mean'] = df_ball_positions['mid_y'].rolling(window=5, min_periods=1,
+        df_ball_positions['mid_y_rolling_mean'] = df_ball_positions['mid_y'].rolling(window=self.config.ROLLING_WINDOW_SIZE, min_periods=1,
                                                                                      center=False).mean()
         df_ball_positions['delta_y'] = df_ball_positions['mid_y_rolling_mean'].diff()
-        minimum_change_frames_for_hit = 25
+        minimum_change_frames_for_hit = self.config.MINIMUM_CHANGE_FRAMES_FOR_HIT
         for i in range(1, len(df_ball_positions) - int(minimum_change_frames_for_hit * 1.2)):
             negative_position_change = (
                 df_ball_positions['delta_y'].iloc[i] > 0 > df_ball_positions['delta_y'].iloc[i + 1])
@@ -53,22 +54,24 @@ class BallTracker:
         return frame_nums_with_ball_hits
 
     def detect_frames(self,
-                      frames,
+                      frames: list,
                       read_from_stubs=False,
                       stubs_path=None,
                       conf = 0.2):
-        import os
-        if read_from_stubs and stubs_path is not None and os.path.exists(stubs_path):
-            with open(stubs_path, 'rb') as f:
-                return pickle.load(f)
-
         ball_detect = []
+
+        if read_from_stubs and stubs_path is not None:
+            with open(stubs_path, 'rb') as f:
+                ball_detect = pickle.load(f)
+            return ball_detect
 
         for frame in frames:
             ball_dict = self._detect_frame(frame, conf)
             ball_detect.append(ball_dict)
 
         if stubs_path is not None:
+            import os
+            os.makedirs(os.path.dirname(stubs_path), exist_ok=True)
             with open(stubs_path, 'wb') as f:
                 pickle.dump(ball_detect, f)
 
@@ -84,17 +87,4 @@ class BallTracker:
             ball_dict[1] = bbox
 
         return ball_dict
-
-    @staticmethod
-    def draw_bboxes(frames, detection):
-        output_frames = []
-        for frame, ball_dict in zip(frames, detection):
-            # Draw bboxes
-            for track_id, bbox in ball_dict.items():
-                xmin, ymin, xmax, ymax = bbox
-                cv2.rectangle(frame, (int(xmin), int(ymin)), (int(xmax), int(ymax)), (0, 225, 0), 2)
-                cv2.putText(frame, f"Ball Id: {track_id}", (int(xmin), int(ymin)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 225, 0), 2, cv2.LINE_AA)
-            output_frames.append(frame)
-
-        return output_frames
+
