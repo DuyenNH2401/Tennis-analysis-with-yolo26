@@ -8,6 +8,7 @@ class CourtLineDetector():
         self.model = models.resnet50(weights=None)
         self.model.fc = nn.Linear(self.model.fc.in_features, 14*2)
         self.model.load_state_dict(torch.load(model_path, map_location='cpu'))
+        self.keypoints = None
 
         self.transform = transforms.Compose([
             transforms.ToPILImage(),
@@ -31,12 +32,13 @@ class CourtLineDetector():
         kps[::2] = kps[::2] * ori_width / 224.0
         kps[1::2] = kps[1::2] * ori_height / 224.0
 
+        self.keypoints = kps
         return kps
 
-    def draw_on_frames(self, frames):
+    def draw_on_frames(self, frames, keypoints=None):
         out_frames = []
         for frame in frames:
-            current_keypoints = self.predict(frame)
+            current_keypoints = keypoints if keypoints is not None else self.predict(frame)
             frame = self.draw_keypoints(frame, current_keypoints)
             out_frames.append(frame)
         return out_frames

@@ -24,6 +24,10 @@ class MiniCourt:
         self.drawing_keypoints = self.set_court_drawing_keypoints()
         self.lines = config.lines
 
+        # For Heatmap
+        import numpy as np
+        self.heatmap_layer = np.zeros((frame.shape[0], frame.shape[1]), dtype=np.float32)
+
     def set_court_drawing_keypoints(self):
         drawing_keypoints = [0] * (14*2)
         #Point 0
@@ -73,6 +77,9 @@ class MiniCourt:
         return convert_meters_to_pixels(meters,
                                         config.DOUBLE_LINE_WIDTH,
                                         self.court_drawing_width)
+
+    def get_meters_from_mini_court_pixels(self, pixels):
+        return (pixels * config.DOUBLE_LINE_WIDTH) / self.court_drawing_width
 
     def draw_background_rectangle(self, frame):
         overplay = frame.copy()
@@ -147,10 +154,11 @@ class MiniCourt:
                 output_player_bboxes.append({})
                 output_ball_bboxes.append({})
                 continue
-            closest_player_id_to_ball = min(player_bbox.keys(), key=lambda x: measure_distance(ball_pos,
+            closest_player_id_to_ball = min(player_bbox.keys(), key=lambda x: measure_point_distance(ball_pos,
                                                                                                get_center_bbox(player_bbox[x])))
 
             output_player_bboxes_dict = {}
+            ball_mini_court_position = None
             for player_id, bbox in player_bbox.items():
                 foot_pos = get_foot_position(bbox)
 
@@ -166,6 +174,9 @@ class MiniCourt:
                     for i in range(frame_inx_min, frame_inx_max)
                     if player_id in player_bboxes[i]
                 ]
+
+                if not bboxes_height_in_pixel:
+                    continue
 
                 max_player_height_in_pixel = max(bboxes_height_in_pixel)
 
@@ -183,23 +194,67 @@ class MiniCourt:
                     closest_keypoint = (original_court_kps[closest_keypoint_index * 2],
                                         original_court_kps[closest_keypoint_index * 2 + 1])
 
-                    mini_court_player_position = self.get_mini_court_coordinates(ball_pos,
+                    ball_mini_court_position = self.get_mini_court_coordinates(ball_pos,
                                                      closest_keypoint,
                                                      closest_keypoint_index,
                                                      max_player_height_in_pixel,
                                                      player_height.get(player_id,
                                                                        config.PLAYER_1_HEIGHT_METERS))
 
-                    output_ball_bboxes.append({1:mini_court_player_position})
-                output_player_bboxes.append(output_player_bboxes_dict)
+            output_player_bboxes.append(output_player_bboxes_dict)
+            if ball_mini_court_position is not None:
+                output_ball_bboxes.append({1: ball_mini_court_position})
+            else:
+                output_ball_bboxes.append({})
         return output_player_bboxes, output_ball_bboxes
 
     def draw_points_on_mini_court(self, frames, positions, color=(0, 255, 0)):
         for frame_num, frame in enumerate(frames):
-            for _, position in positions[frame_num].items():
-                x, y = position
-                x = int(x)
-                y = int(y)
-                cv2.circle(frame, (x, y), 3, color, -1)
+            if frame_num < len(positions) and positions[frame_num]:
+                for _, position in positions[frame_num].items():
+                    x, y = position
+                    x = int(x)
+                    y = int(y)
+                    cv2.circle(frame, (x, y), 3, color, -1)
 
         return frames
+
+    def draw_heatmap_on_mini_court(self, frame, current_positions):
+        import numpy as np
+        # Update heatmap layer with current positions
+        for _, position in current_positions.items():
+            x, y = int(position[0]), int(position[1])
+            if 0 <= y < self.heatmap_layer.shape[0] and 0 <= x < self.heatmap_layer.shape[1]:
+                self.heatmap_layer[y, x] += 1.0
+                
+        # Apply gaussian blur to create the heat effect
+        heatmap_blurred = cv2.GaussianBlur(self.heatmap_layer, (31, 31), 0)
+        
+        # Normalize
+        max_val = np.max(heatmap_blurred)
+        if max_val > 0:
+            heatmap_norm = heatmap_blurred / max_val
+        else:
+            heatmap_norm = heatmap_blurred
+            
+        # Colorize
+        heatmap_color = cv2.applyColorMap((heatmap_norm * 255).astype(np.uint8), cv2.COLORMAP_JET)
+        
+        # Create a mask where heatmap is active (value > small threshold)
+        mask = heatmap_norm > 0.05
+        
+        # Overlay only within the mini court area
+        output_frame = frame.copy()
+        
+        # Crop mask to mini court boundaries
+        x1, y1 = int(self.start_x), int(self.start_y)
+        x2, y2 = int(self.end_x), int(self.end_y)
+        
+        court_mask = np.zeros_like(mask)
+        court_mask[y1:y2, x1:x2] = mask[y1:y2, x1:x2]
+        
+        # Apply overlay
+        alpha = 0.5
+        output_frame[court_mask] = cv2.addWeighted(frame[court_mask], 1 - alpha, heatmap_color[court_mask], alpha, 0).squeeze()
+        
+        return output_frame

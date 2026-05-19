@@ -8,18 +8,32 @@ class PlayerTracker:
         self.model = YOLO(model_path)
 
     def choose_and_filter(self, court_keypoints, player_detections):
-        player_detections_first_frame = player_detections[0]
-        chosen_player =self._choose_player(court_keypoints, player_detections_first_frame)
+        from collections import Counter
+        player_votes = Counter()
+        check_frames = min(50, len(player_detections))
+        
+        for i in range(check_frames):
+            if not player_detections[i]:
+                continue
+            chosen_in_frame = self._choose_player(court_keypoints, player_detections[i])
+            for player_id in chosen_in_frame:
+                player_votes[player_id] += 1
+                
+        most_common = player_votes.most_common(2)
+        chosen_players = [item[0] for item in most_common]
+        
         filtered_player_detections = []
         for player_dict in player_detections:
             filter_player_dict = {track_id:bbox
                                   for track_id, bbox in player_dict.items()
-                                  if track_id in chosen_player}
+                                  if track_id in chosen_players}
             filtered_player_detections.append(filter_player_dict)
         return filtered_player_detections
 
     @staticmethod
     def _choose_player(court_keypoints, player_dict):
+        if len(player_dict) < 2:
+            return list(player_dict.keys())
 
         distances = []
         for track_id, bbox in player_dict.items():
@@ -34,16 +48,16 @@ class PlayerTracker:
         return chosen_player
 
     def detect_frames(self,
-                      frames: list,
+                      frames,
                       read_from_stubs=False,
                       stubs_path=None,
                       conf = 0.2):
-        player_detect = []
-
-        if read_from_stubs and stubs_path is not None:
+        import os
+        if read_from_stubs and stubs_path is not None and os.path.exists(stubs_path):
             with open(stubs_path, 'rb') as f:
-                player_detect = pickle.load(f)
-            return player_detect
+                return pickle.load(f)
+
+        player_detect = []
 
         for frame in frames:
             player_dict = self._detect_frame(frame, conf)

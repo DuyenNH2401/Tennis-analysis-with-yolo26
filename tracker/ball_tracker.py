@@ -53,16 +53,16 @@ class BallTracker:
         return frame_nums_with_ball_hits
 
     def detect_frames(self,
-                      frames: list,
+                      frames,
                       read_from_stubs=False,
                       stubs_path=None,
                       conf = 0.2):
-        ball_detect = []
-
-        if read_from_stubs and stubs_path is not None:
+        import os
+        if read_from_stubs and stubs_path is not None and os.path.exists(stubs_path):
             with open(stubs_path, 'rb') as f:
-                ball_detect = pickle.load(f)
-            return ball_detect
+                return pickle.load(f)
+
+        ball_detect = []
 
         for frame in frames:
             ball_dict = self._detect_frame(frame, conf)
