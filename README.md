@@ -8,7 +8,7 @@ The **Tennis Match Analytics Pipeline** is an end-to-end computer vision and dat
 
 This project was built to demonstrate a complete, scalable AI pipeline applicable to real-world sports analytics.
 
-## Technical Highlights 🚀
+## Technical Highlights 
 * **Multi-Model Pipeline**: Integrates **YOLO** for robust object tracking (players & ball) and a custom **ResNet50** model for predicting 14 specific court structural keypoints.
 * **Advanced Data Handling & Signal Processing**: 
   * Implements `pandas` interpolation to handle missing frames caused by high-speed ball occlusion.
