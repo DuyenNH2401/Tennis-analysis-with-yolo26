@@ -1,9 +1,7 @@
 # Tennis Analysis System
 
 ## Demo
-<video src="output_videos/output_video.mp4" controls="controls" style="max-width: 100%;"></video>
-
-*(Note: GitHub supports native video rendering. Alternatively, you can use a GIF: `![Demo](output_videos/demo.gif)`)*
+![Demo](output_videos/demo.gif)
 
 ## Overview
 The Tennis Analysis System is an advanced computer vision project designed to extract deep insights from tennis match videos. By leveraging state-of-the-art deep learning models, this system automatically tracks players and the ball, maps their real-world coordinates to a standardized mini-court, and computes comprehensive game analytics such as player movement and shot detection.
